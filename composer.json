@@ -1,0 +1,26 @@
+{
+    "name": "hwatu/doutu",
+    "description": "微信聊天图片生成工具 - 支持多种格式和动态效果",
+    "type": "project",
+    "license": "MIT",
+    "require": {
+        "php": ">=8.2",
+        "ext-gd": "*",
+        "ext-json": "*",
+        "ext-mbstring": "*"
+    },
+    "suggest": {
+        "ext-imagick": "建议安装以支持 GIF 动画合并",
+        "ext-avif": "建议安装以支持 AVIF 输出"
+    },
+    "autoload": {
+        "psr-4": {
+            "DouTu\\": "src/"
+        }
+    },
+    "scripts": {
+        "serve": "php -S localhost:8080 -t public",
+        "test": "phpunit",
+        "cache:clean": "php scripts/clean-cache.php"
+    }
+}

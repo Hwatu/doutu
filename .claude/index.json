@@ -1,0 +1,236 @@
+{
+  "project": {
+    "name": "doutu",
+    "description": "微信聊天图片生成工具 (斗图助手)",
+    "language": "PHP",
+    "timestamp": "2026-01-28T17:35:56+08:00"
+  },
+  "scan_summary": {
+    "total_files_estimated": 15,
+    "files_scanned": 15,
+    "coverage_percentage": 100,
+    "truncated": false
+  },
+  "root_module": {
+    "path": "/Users/hwatu/Documents/GitHub/doutu",
+    "entry_point": "index.php",
+    "key_files": [
+      "index.php",
+      "font.html",
+      "upload.html",
+      "Dockerfile",
+      "docker-compose.yml",
+      "text2image.py"
+    ],
+    "directories": {
+      "fonts": {
+        "purpose": "字体文件存储目录",
+        "permission_required": 777,
+        "supported_formats": ["ttf", "ttc", "otf"]
+      },
+      "configs": {
+        "purpose": "用户配置存储目录（JSON 格式）",
+        "permission_required": 777,
+        "structure": "configs/{wxid}.json"
+      },
+      "output": {
+        "purpose": "生成的图片缓存目录",
+        "permission_required": 777,
+        "cleanup_supported": true,
+        "cleanup_config": {
+          "ttl_minutes": 1440,
+          "interval_minutes": 60
+        }
+      },
+      "img": {
+        "purpose": "图片资源目录（背景图等）",
+        "default_background": "background.png",
+        "permission_required": 777
+      }
+    }
+  },
+  "api_endpoints": [
+    {
+      "action": "search",
+      "method": "GET",
+      "description": "生成表情图片接口",
+      "params": {
+        "ac": "search 或 all",
+        "wxid": "微信 ID（必须已授权）",
+        "keyword": "要生成的文字",
+        "start": "分页起始位置（可选）",
+        "limit": "每页数量（默认 40）"
+      },
+      "response": {
+        "items": "生成的图片列表",
+        "pageNum": "当前页码",
+        "pageSize": "每页数量",
+        "totalPages": "总页数",
+        "totalSize": "总数量"
+      }
+    },
+    {
+      "action": "config",
+      "method": "GET/POST",
+      "description": "获取或保存用户配置",
+      "get_params": {
+        "id": "配置 ID（微信 ID）"
+      },
+      "post_body": {
+        "id": "配置 ID",
+        "styles": "样式配置数组",
+        "cleanup": "清理配置对象"
+      }
+    },
+    {
+      "action": "fonts",
+      "method": "GET",
+      "description": "获取可用字体列表",
+      "response": {
+        "code": "状态码（1 成功）",
+        "data": "字体列表数组，包含 file 和 name 字段"
+      }
+    },
+    {
+      "action": "upload",
+      "method": "POST",
+      "description": "上传字体文件",
+      "params": {
+        "font": "字体文件（multipart/form-data）"
+      },
+      "constraints": {
+        "formats": ["ttf", "ttc"],
+        "max_size": "50MB"
+      }
+    },
+    {
+      "action": "subset",
+      "method": "GET",
+      "description": "生成预览图片",
+      "params": {
+        "text": "预览文字",
+        "font": "字体文件名",
+        "size": "字号",
+        "weight": "字体粗细",
+        "posX": "水平位置百分比",
+        "posY": "垂直位置百分比",
+        "color": "文字颜色",
+        "bgcolor": "背景颜色",
+        "bgsize": "背景图缩放方式",
+        "effect": "特效类型",
+        "random": "是否随机颜色",
+        "autoSize": "是否自动字号",
+        "wrapAuto": "是否自动换行",
+        "wrapLimit": "单行最大宽度",
+        "layoutMode": "布局模式（standard/chat）"
+      }
+    }
+  ],
+  "image_generation_modes": [
+    {
+      "mode": "standard",
+      "description": "标准模式，支持纯色、透明、图片背景",
+      "canvas_size": "1024x1024",
+      "features": ["自动字号", "自动换行", "文字特效", "字体粗细"]
+    },
+    {
+      "mode": "chat",
+      "description": "聊天气泡模式，使用九宫格拉伸背景",
+      "canvas_size": "自适应",
+      "features": ["九宫格拉伸", "内边距控制", "最小尺寸控制", "水平翻转"]
+    },
+    {
+      "mode": "template_card",
+      "description": "模板卡片模式，基于预设模板生成",
+      "canvas_size": "跟随模板",
+      "features": ["模板图片", "文字描边", "阴影效果", "高光效果"]
+    }
+  ],
+  "text_effects": [
+    "none",
+    "shadow",
+    "outline",
+    "glow",
+    "marquee",
+    "flowlight",
+    "liuguang"
+  ],
+  "authorization": {
+    "file": "wxid.txt",
+    "format": "每行一个微信 ID",
+    "behavior": "未授权用户返回替换文案：'我是狗，偷接口，偷来接口当小丑'"
+  },
+  "gaps": {
+    "missing": [],
+    "needs_attention": [
+      "wxid.txt 文件为空或未配置示例",
+      "fonts/ 目录下暂无字体文件",
+      "configs/ 目录下暂无用户配置",
+      "output/ 目录下暂无生成缓存"
+    ],
+    "improvements": [
+      "考虑添加单元测试覆盖核心图片生成逻辑",
+      "可以考虑添加 Redis 缓存机制优化性能",
+      "建议添加请求频率限制防止滥用",
+      "可以考虑支持更多图片格式（WebP、AVIF）"
+    ]
+  },
+  "ignored_patterns": [
+    ".git/**",
+    ".venv/**",
+    ".DS_Store",
+    "node_modules/**",
+    "dist/**",
+    "build/**",
+    ".next/**",
+    "__pycache__/**",
+    "*.lock",
+    "*.log",
+    "*.bin",
+    "*.pdf",
+    "*.png",
+    "*.jpg",
+    "*.jpeg",
+    "*.gif",
+    "*.mp4",
+    "*.zip",
+    "*.tar",
+    "*.gz"
+  ],
+  "statistics": {
+    "total_lines_code": {
+      "index.php": 1740,
+      "font.html": 1050,
+      "upload.html": 295,
+      "text2image.py": 53
+    },
+    "languages": [
+      {
+        "name": "PHP",
+        "files": 1,
+        "lines": 1740,
+        "percentage": 55.2
+      },
+      {
+        "name": "HTML",
+        "files": 2,
+        "lines": 1345,
+        "percentage": 42.7
+      },
+      {
+        "name": "Python",
+        "files": 1,
+        "lines": 53,
+        "percentage": 1.7
+      },
+      {
+        "name": "Other",
+        "files": 5,
+        "lines": 17,
+        "percentage": 0.4
+      }
+    ],
+    "documentation_files": 4,
+    "configuration_files": 2
+  }
+}

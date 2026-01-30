@@ -980,6 +980,14 @@ function generateImage($text, $params) {
         $requestedFontSize = isset($params['font_size']) ? max(12, (int) $params['font_size']) : 32;
         $layoutMode = $params['layout_mode'] ?? 'standard';
         
+        if ($layoutMode === 'template_card') {
+            $templateResult = generateTemplateCardImage($text, $params);
+            if ($templateResult !== null) {
+                return $templateResult;
+            }
+            $layoutMode = 'standard';
+        }
+        
         if ($layoutMode === 'chat') {
             return generateChatBubbleImage($text, $params);
         }
@@ -1421,6 +1429,139 @@ function generateChatBubbleImage($text, $params) {
     } catch (Exception $e) {
         return null;
     }
+}
+
+
+function generateTemplateCardImage($text, $params) {
+    global $config;
+    
+    $fontFile = $params['font_file'] ?? null;
+    if (!$fontFile || !is_readable($fontFile)) {
+        return null;
+    }
+    
+    $defaultTemplate = __DIR__ . '/template.jpeg';
+    $templatePath = resolveImagePath($params['template_path'] ?? $defaultTemplate, $defaultTemplate);
+    $templateImage = loadImageResource($templatePath);
+    if (!$templateImage) {
+        return null;
+    }
+    
+    $width = imagesx($templateImage);
+    $height = imagesy($templateImage);
+    if ($width <= 0 || $height <= 0) {
+        imagedestroy($templateImage);
+        return null;
+    }
+    
+    $image = imagecreatetruecolor($width, $height);
+    imagealphablending($image, true);
+    imagesavealpha($image, true);
+    imagecopy($image, $templateImage, 0, 0, 0, 0, $width, $height);
+    imagedestroy($templateImage);
+    
+    $padLeft = normalizeTemplatePaddingValue($params['template_pad_left'] ?? null, $width, 0.08);
+    $padRight = normalizeTemplatePaddingValue($params['template_pad_right'] ?? null, $width, 0.08);
+    $padTop = normalizeTemplatePaddingValue($params['template_pad_top'] ?? null, $height, 0.18);
+    $padBottom = normalizeTemplatePaddingValue($params['template_pad_bottom'] ?? null, $height, 0.12);
+    
+    $textBoxWidth = max(20, $width - $padLeft - $padRight);
+    $textBoxHeight = max(20, $height - $padTop - $padBottom);
+    if ($textBoxWidth <= 0 || $textBoxHeight <= 0) {
+        imagedestroy($image);
+        return null;
+    }
+    
+    $minFont = isset($params['template_font_min']) ? max(12, (int) $params['template_font_min']) : 42;
+    $maxFont = isset($params['template_font_max']) ? max($minFont, (int) $params['template_font_max']) : 150;
+    
+    $normalizedText = trim((string) $text);
+    if ($normalizedText === '') {
+        $normalizedText = ' ';
+    }
+    
+    $bestLayout = null;
+    $bestSize = $minFont;
+    $low = $minFont;
+    $high = $maxFont;
+    while ($low <= $high) {
+        $mid = (int) (($low + $high) / 2);
+        $lines = prepareTextLines($normalizedText, $fontFile, $mid, $textBoxWidth);
+        $metrics = calculateTextMetrics($lines, $fontFile, $mid);
+        if ($metrics['max_width'] <= $textBoxWidth && $metrics['total_height'] <= $textBoxHeight) {
+            $bestSize = $mid;
+            $bestLayout = [$lines, $metrics];
+            $low = $mid + 1;
+        } else {
+            $high = $mid - 1;
+        }
+    }
+    
+    if ($bestLayout === null) {
+        $bestSize = $minFont;
+        $fallbackLines = prepareTextLines($normalizedText, $fontFile, $bestSize, $textBoxWidth);
+        $bestLayout = [$fallbackLines, calculateTextMetrics($fallbackLines, $fontFile, $bestSize)];
+    }
+    
+    $lines = $bestLayout[0];
+    $metrics = $bestLayout[1];
+    $lineHeight = $metrics['line_height'];
+    $lineSpacing = $metrics['line_spacing'];
+    $lineBoxes = $metrics['boxes'];
+    
+    $startY = $padTop + (int) (($textBoxHeight - $metrics['total_height']) / 2) + $lineHeight;
+    
+    $baseColorHex = $params['template_text_color'] ?? ($params['font_color'] ?? '#111111');
+    $fillColor = parseColorOrDefault($baseColorHex, '#111111');
+    $outlineColor = adjustColorLevels($fillColor, -0.35);
+    $highlightColor = adjustColorLevels($fillColor, 0.5);
+    $shadowColor = parseColorOrDefault($params['template_shadow_color'] ?? '#000000', '#000000');
+    
+    $shadowOffsetX = isset($params['template_shadow_offset_x']) ? (int) $params['template_shadow_offset_x'] : 4;
+    $shadowOffsetY = isset($params['template_shadow_offset_y']) ? (int) $params['template_shadow_offset_y'] : 5;
+    $shadowAlpha = isset($params['template_shadow_alpha']) ? max(0, min(127, (int) $params['template_shadow_alpha'])) : 90;
+    $highlightAlpha = isset($params['template_highlight_alpha']) ? max(0, min(127, (int) $params['template_highlight_alpha'])) : 60;
+    $highlightOffset = max(1, (int) round($bestSize * 0.08));
+    $strokeRatio = 0.035;
+    
+    foreach ($lines as $index => $line) {
+        $lineText = $line === '' ? ' ' : $line;
+        $lineBox = $lineBoxes[$index] ?? imagettfbbox($bestSize, 0, $fontFile, $lineText);
+        $lineWidth = abs($lineBox[4] - $lineBox[0]);
+        $lineX = $padLeft + max(0, ($textBoxWidth - $lineWidth) / 2) - $lineBox[0];
+        $lineY = $startY + $index * ($lineHeight + $lineSpacing);
+        
+        drawTemplateTextLine($image, $bestSize, $fontFile, $lineText, $lineX, $lineY, [
+            'fill_color' => $fillColor,
+            'outline_color' => $outlineColor,
+            'shadow_color' => $shadowColor,
+            'highlight_color' => $highlightColor,
+            'shadow_offset_x' => $shadowOffsetX,
+            'shadow_offset_y' => $shadowOffsetY,
+            'shadow_alpha' => $shadowAlpha,
+            'highlight_alpha' => $highlightAlpha,
+            'highlight_offset' => $highlightOffset,
+            'stroke_ratio' => $strokeRatio
+        ]);
+    }
+    
+    $filenameSeed = json_encode([
+        'mode' => 'template_card',
+        'text' => $normalizedText,
+        'font' => basename($fontFile),
+        'template' => basename($templatePath),
+        'pads' => [$padLeft, $padRight, $padTop, $padBottom],
+        'size' => $bestSize,
+        'color' => $baseColorHex
+    ], JSON_UNESCAPED_UNICODE);
+    $filename = md5($filenameSeed) . '.png';
+    $filepath = $config['output_path'] . $filename;
+    imagepng($image, $filepath);
+    imagedestroy($image);
+    
+    return [
+        'url' => 'http://' . $_SERVER['HTTP_HOST'] . dirname($_SERVER['PHP_SELF']) . '/output/' . $filename
+    ];
 }
 
 /**
